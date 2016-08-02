@@ -38,7 +38,10 @@ class LKML(GeneralList):
                                                                 options.month,
                                                                 day))]
                 if options.name in columns[2]:
-                    self.emails.append(re.split('[><]', columns[1])[1])
+                    self.emails.append((re.split('[><]', columns[1])[1],
+                                        '{0}.{1}.{2}'.format(day,
+                                                             options.month,
+                                                             options.year)))
 
 
 class RHInternal(GeneralList):
@@ -63,9 +66,18 @@ class RHInternal(GeneralList):
         patterns = [b'From ' + email.encode('utf-8')
                     for email in options.email]
         for index, line in enumerate(lines):
-            for pattern in patterns:
-                if pattern in line:
-                    for subject_line in lines[index + 1:]:
-                        if b'Subject: ' in subject_line:
-                            self.emails.append(subject_line[len('Subject: '):])
-                            break
+            if any(match in line for match in patterns):
+                subject = None
+                date = None
+                for next_line in lines[index + 1:]:
+                    if b'Subject: ' in next_line:
+                        subject = next_line[len('Subject: '):].decode('utf-8')
+                    if b'Date: ' in next_line:
+                        day = next_line[
+                            len('Date: day, '):].decode('utf-8').split(' ')[0]
+                        date = '{0}.{1}.{2}'.format(day,
+                                                    options.month,
+                                                    options.year)
+                    if subject and date:
+                        self.emails.append((subject, date))
+                        break

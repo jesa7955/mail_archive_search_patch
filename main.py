@@ -7,6 +7,12 @@ import get_emails
 import sys
 
 
+def print_list(mails, list_name):
+    print('{0} messages found in {1}'.format(len(mails.emails), list_name))
+    for message, date in mails.emails:
+        print('    {0}: {1}'.format(date, message))
+
+
 def main():
     """
     Parse configuration file and command line options - use either command
@@ -28,17 +34,12 @@ def main():
 
     if options.lkml:
         lkml = get_emails.LKML(options)
-        print('{0} messages found in LKML'.format(len(lkml.emails)))
-        for message in lkml.emails:
-            print(4 * ' ' + message)
+        print_list(lkml, 'LKML')
     print()
     for mailing_list in options.rh_internal:
         mails = get_emails.RHInternal(options, mailing_list)
         if mails.emails is not None:
-            print('{0} messages found in {1}'.format(len(mails.emails),
-                                                     mailing_list))
-            for message in mails.emails:
-                print(4 * ' ' + message.decode('utf-8'))
+            print_list(mails, mailing_list)
         print()
 
 
