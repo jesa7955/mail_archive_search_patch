@@ -9,15 +9,14 @@ CONFIG = os.path.expanduser("~/.list_archive")
 
 class GeneralConfig(object):
     """ General option class """
-    parser = None
-    name = None
-    email = None
-    lkml = None
-    rh_internal = None
-    month = None
-    year = None
-
     def __init__(self, arguments=None):
+        self.parser = None
+        self.name = None
+        self.email = None
+        self.lkml = None
+        self.rh_internal = None
+        self.month = None
+        self.year = None
         self._get_options(arguments)
 
     def _get_options(self, arguments=None):
@@ -26,9 +25,9 @@ class GeneralConfig(object):
 
 class Config(GeneralConfig):
     """ Parse configuration file if command options are missing """
-    parser = configparser.ConfigParser()
-
     def _get_options(self, arguments=None):
+        self.parser = configparser.ConfigParser()
+
         try:
             self.parser.read_file(open(CONFIG))
             self.month = int(self.parser['general']['month'])
@@ -50,13 +49,13 @@ class Config(GeneralConfig):
 
 class Options(GeneralConfig):
     """ Parse command line options """
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--name')
-    parser.add_argument('--email', nargs='*')
-    parser.add_argument('--month')
-    parser.add_argument('--year')
-
     def _get_options(self, arguments=None):
+        self.parser = argparse.ArgumentParser()
+        self.parser.add_argument('--name')
+        self.parser.add_argument('--email', nargs='*')
+        self.parser.add_argument('--month')
+        self.parser.add_argument('--year')
+
         if not len(arguments):
             # No CMD line arguments, used with config file
             return

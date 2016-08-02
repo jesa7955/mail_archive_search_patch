@@ -9,10 +9,9 @@ import urllib.request
 
 class GeneralList(object):
     """ General list class """
-    url_base = None
-    emails = []
 
     def __init__(self, options, list_name=None):
+        self.emails = []
         self._retrieve(options, list_name)
 
     def _retrieve(self, options, list_name=None):
