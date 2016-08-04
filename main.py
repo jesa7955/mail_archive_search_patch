@@ -8,9 +8,12 @@ import sys
 
 
 def print_list(mails, list_name):
-    print('{0} messages found in {1}'.format(len(mails.emails), list_name))
-    for message, date in mails.emails:
-        print('    {0}: {1}'.format(date, message))
+    # Differentiate between nonexistent mailing list and no found emails
+    if mails.emails:
+        print('{0} messages found in {1}'.format(len(mails.emails), list_name))
+        for message, date in mails.emails:
+            print('    {0}: {1}'.format(date, message))
+        print()
 
 
 def main():
@@ -33,14 +36,9 @@ def main():
             return
 
     if options.lkml:
-        lkml = get_emails.LKML(options)
-        print_list(lkml, 'LKML')
-    print()
+        print_list(get_emails.LKML(options), 'LKML')
     for mailing_list in options.rh_internal:
-        mails = get_emails.RHInternal(options, mailing_list)
-        if mails.emails is not None:
-            print_list(mails, mailing_list)
-        print()
+        print_list(get_emails.RHInternal(options, mailing_list), mailing_list)
 
 
 if __name__ == '__main__':

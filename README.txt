@@ -9,7 +9,7 @@ If you want to use config file, place it as ~/.list_archive
     year = 2016
     month = 7
 
-    [lkml]
+    [LKML]
 
     [RH]
     lists = list-name1,list-2,another-list

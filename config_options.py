@@ -56,7 +56,7 @@ class Options(GeneralConfig):
         self.parser.add_argument('--month')
         self.parser.add_argument('--year')
 
-        if not len(arguments):
+        if not arguments:
             # No CMD line arguments, used with config file
             return
         opt, args = self.parser.parse_known_args(arguments)
