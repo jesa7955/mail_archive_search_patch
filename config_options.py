@@ -33,7 +33,7 @@ class Config(GeneralConfig):
             self.month = int(self.parser['general']['month'])
             self.year = int(self.parser['general']['year'])
             self.name = self.parser['general']['name']
-            self.email = [mail for mail in
+            self.email = [mail.strip() for mail in
                           self.parser['general']['email'].split(',')]
         except FileNotFoundError:
             print('Configuration file {0} not found'.format(CONFIG))
@@ -41,7 +41,7 @@ class Config(GeneralConfig):
             print('{0} not configured in {1}'.format(key_not_found, CONFIG))
         self.lkml = 'LKML' in self.parser.sections()
         try:
-            self.rh_internal = [mailing_list for mailing_list in
+            self.rh_internal = [mailing_list.strip() for mailing_list in
                                 self.parser['RH']['lists'].split(',')]
         except KeyError:
             self.rh_internal = []
