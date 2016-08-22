@@ -151,6 +151,13 @@ class GzipArchived(GeneralList):
                         subject_end = index2
                         subject = b' '.join(item.strip() for item in lines[index + 1:][subject_start:subject_end]).decode('utf-8')[len('Subject: '):]
                         break
+                for index2, line2 in enumerate(lines[index + 1:]):
+                    if re.match(b'^From .*', line2):
+                        in_reply_to = [next_line for next_line in lines[index + 1:index + 1 + index2]
+                                       if re.match(b'^In-Reply-To: .*', next_line)]
+                        if len(in_reply_to) != 0 and not re.match('.*re:.*', subject, re.IGNORECASE):
+                            subject = 'Re: ' + subject
+                        break
                 message_id = next(next_line[len(b'Message-ID: '):].decode('utf-8').strip('<>')
                                   for next_line in lines[index + 1:]
                                   if b'Message-ID: ' in next_line)
