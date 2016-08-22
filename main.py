@@ -4,6 +4,7 @@
 
 import config_options
 import get_emails
+import re
 import sys
 
 
@@ -14,7 +15,6 @@ def print_list(mails, list_name):
         for message, date in mails.emails:
             print('    {0}: {1}'.format(date, message))
         print()
-
 
 def main():
     """
@@ -35,11 +35,49 @@ def main():
         if options.email is None:
             return
 
+    #if options.lkml:
+    #    print_list(get_emails.LKML(options), 'LKML')
+    #for mailing_list in options.rh_internal:
+    #    print_list(get_emails.RHInternal(options, mailing_list), mailing_list)
+    #for mailing_list in options.pipermail:
+    #    print_list(get_emails.Pipermail(options, mailing_list), mailing_list)
+    #for mailing_list in options.hyperkitty:
+    #    print_list(get_emails.HyperKitty(options, mailing_list), mailing_list)
+    #for mailing_list in options.spinics:
+    #    print_list(get_emails.Spinics(options, mailing_list), mailing_list)
+    emails = {}
     if options.lkml:
-        print_list(get_emails.LKML(options), 'LKML')
+        emails.update(get_emails.LKML(options).emails)
     for mailing_list in options.rh_internal:
-        print_list(get_emails.RHInternal(options, mailing_list), mailing_list)
+        emails.update(get_emails.RHInternal(options, mailing_list).emails)
+    for mailing_list in options.pipermail:
+        emails.update(get_emails.Pipermail(options, mailing_list).emails)
+    for mailing_list in options.hyperkitty:
+        emails.update(get_emails.HyperKitty(options, mailing_list).emails)
+    for mailing_list in options.spinics:
+        emails.update(get_emails.Spinics(options, mailing_list).emails)
 
+    emails = [info for message_id, info in emails.items()]
+    emails.sort(key=lambda tup: tup[1])
+    print('{0} message(s) found'.format(len(emails)))
+    for message, date in emails:
+        print('    {0}: {1}'.format(date, message))
+    emails = [(date, message) for message, date in dict(emails[-1::-1]).items()]
+    emails.sort(key=lambda tup: tup[0])
+    patched = []
+    reviewed = []
+    for date, message in emails:
+        if re.match('.*\Wpatch\W.*', message, re.IGNORECASE):
+            if re.match('.*re:.*', message, re.IGNORECASE):
+                reviewed.append((date, message))
+            else:
+                patched.append((date, message))
+    print('{0} patched'.format(len(patched)))
+    for date, message in patched:
+        print('    {0}: {1}'.format(date, message))
+    print('{0} reviewed'.format(len(reviewed)))
+    for date, message in reviewed:
+        print('    {0}: {1}'.format(date, message))
 
 if __name__ == '__main__':
     main()

@@ -5,13 +5,14 @@ import datetime
 import gzip
 import re
 import urllib.request
+import dateparser
 
 
 class GeneralList(object):
     """ General list class """
 
     def __init__(self, options, list_name=None):
-        self.emails = []
+        self.emails = {}
         self._retrieve(options, list_name)
 
     def _retrieve(self, options, list_name=None):

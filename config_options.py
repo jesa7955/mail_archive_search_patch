@@ -15,13 +15,15 @@ class GeneralConfig(object):
         self.email = None
         self.lkml = None
         self.rh_internal = None
+        self.pipermail = None
+        self.hyperkitty = None
+        self.spinics = None
         self.month = None
         self.year = None
         self._get_options(arguments)
 
     def _get_options(self, arguments=None):
         raise NotImplementedError
-
 
 class Config(GeneralConfig):
     """ Parse configuration file if command options are missing """
@@ -46,7 +48,6 @@ class Config(GeneralConfig):
         except KeyError:
             self.rh_internal = []
 
-
 class Options(GeneralConfig):
     """ Parse command line options """
     def _get_options(self, arguments=None):
@@ -55,6 +56,10 @@ class Options(GeneralConfig):
         self.parser.add_argument('--email', nargs='*')
         self.parser.add_argument('--month')
         self.parser.add_argument('--year')
+        self.parser.add_argument('--rh_internal')
+        self.parser.add_argument('--pipermail')
+        self.parser.add_argument('--hyperkitty')
+        self.parser.add_argument('--spinics')
 
         if not arguments:
             # No CMD line arguments, used with config file
@@ -63,6 +68,10 @@ class Options(GeneralConfig):
         self.rh_internal = [mailing_list for mailing_list in args if
                             mailing_list != 'lkml']
         self.lkml = 'lkml' in args
+        self.rh_internal = self._get_list_name(opt.rh_internal)
+        self.pipermail = self._get_list_name(opt.pipermail)
+        self.hyperkitty = self._get_list_name(opt.hyperkitty)
+        self.spinics = self._get_list_name(opt.spinics)
         self.month = int(opt.month)
         self.year = int(opt.year)
         self.name = opt.name
@@ -70,3 +79,9 @@ class Options(GeneralConfig):
         if not all([self.email, self.name, self.month, self.year]):
             print('Make sure you have specified email, name, month and year')
             self.email = None
+
+    def _get_list_name(self, opt):
+        if opt:
+            return opt.split()
+        else:
+            return []
