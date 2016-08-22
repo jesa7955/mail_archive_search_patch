@@ -17,32 +17,47 @@ class GeneralList(object):
     def _retrieve(self, options, list_name=None):
         raise NotImplementedError
 
-
 class LKML(GeneralList):
-    """ Class for retrieving emails from LKML """
-    url_base = 'https://lkml.org/lkml/'
+    """ Class for retrieving from another archiver of LKML """
+    url_base = 'http://lkml.iu.edu/hypermail/linux/kernel/'
 
     def _retrieve(self, options, list_name=None):
-        url = '{0}{1}/{2}/'.format(self.url_base, options.year, options.month)
-        for day in range(1,
-                         calendar.monthrange(options.year,
-                                             options.month)[1] + 1):
-            # Need to specify known User-Agent header because of bot protection
-            req = urllib.request.Request('{0}{1}'.format(url, day),
-                                         headers={'User-Agent': 'Mozilla/5.0'})
-            page = urllib.request.urlopen(req).read().decode('utf-8')
-            table = [row for row in page.split('<tr class=')]
-            for row in table[1:]:
-                columns = [column for column in
-                           row.split('/lkml/{0}/{1}/{2}'.format(options.year,
-                                                                options.month,
-                                                                day))]
-                if options.name in columns[2]:
-                    self.emails.append((re.split('[><]', columns[1])[1],
-                                        '{0}.{1}.{2}'.format(day,
-                                                             options.month,
-                                                             options.year)))
 
+        patterns = []
+        for email in options.email:
+            email_user, email_domain = re.split('@', email)
+            patterns.append('{0} &lt;{1}@{2}&gt;'.format(options.name, email_user, 'x' * len(email_domain)))
+        week_id = 0
+        while True:
+            url = '{0}{1}{2}.{3}/author.html'.format(self.url_base,
+                                                     options.year % 100,
+                                                     str(options.month).zfill(2),
+                                                     week_id)
+            try:
+                lines = urllib.request.urlopen(url).readlines()
+            except urllib.error.HTTPError:
+                return
+            threads = []
+            for index, line in enumerate(lines):
+                if options.name.encode('utf-8') in line:
+                    for index2, line2 in enumerate(lines[index + 1:]):
+                        if re.match(b'<li><strong>.*</strong>$', line2):
+                            threads = lines[index + 1: index + index2 + 1]
+                            break
+                    break
+            for thread in threads:
+                item = re.split('[<>]', thread.decode('utf-8'))
+                subject, date = item[8], dateparser.parse(item[14]).date()
+                detail_url = '{0}{1}'.format(url[:-len('author.html')],
+                                              item[7].split()[-1].split("=")[-1].strip('"'))
+                detail_lines = urllib.request.urlopen(detail_url).read().decode('utf-8').split("\n")
+                for line in detail_lines:
+                    if 'X-Message-Id:' in line:
+                        message_id = line[len('<!--X-Message-Id: '):-len(' -->')].replace('&#45;', '-')
+                    if any(match in line for match in patterns):
+                        self.emails[message_id] = (subject, str(date))
+                        break
+            week_id += 1
 
 class RHInternal(GeneralList):
     """ Class for retrieving emails from internal Red Hat lists """
