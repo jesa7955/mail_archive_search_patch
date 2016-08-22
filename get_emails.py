@@ -138,8 +138,8 @@ class GzipArchived(GeneralList):
             return
         # Some archiver stores email address as "foo at bar.com" format
         patterns  = [b'From ' + email.encode('utf-8')
-                     for email in options.email]
-        patterns += [b'From ' + email.replace('@', ' at ').encode('utf-8')
+                     for email in options.email] + \
+                    [b'From ' + email.replace('@', ' at ').encode('utf-8')
                      for email in options.email]
         for index, line in enumerate(lines):
             if any(match in line for match in patterns):
@@ -149,13 +149,22 @@ class GzipArchived(GeneralList):
                         subject_start = index2
                     elif re.match(b'^.*:.*', line2) and subject_start:
                         subject_end = index2
-                        subject = b' '.join(item.strip() for item in lines[index + 1:][subject_start:subject_end]).decode('utf-8')[len('Subject: '):]
+                        subject = b' '.join(item.strip() for item in lines[index + 1:][subject_start:subject_end]).\
+                                                                                  decode('utf-8')[len('Subject: '):]
                         break
                 for index2, line2 in enumerate(lines[index + 1:]):
                     if re.match(b'^From .*', line2):
                         in_reply_to = [next_line for next_line in lines[index + 1:index + 1 + index2]
                                        if re.match(b'^In-Reply-To: .*', next_line)]
-                        if len(in_reply_to) != 0 and not re.match('.*re:.*', subject, re.IGNORECASE):
+                        patch_start = [start_index for start_index, start_line in enumerate(lines[index + 1:index + 1 + index2])
+                                                       if re.match(b'^--- .*', start_line)]
+                        patch_included = False
+                        for start_index in patch_start:
+                            patch_included = re.match(b'^\+\+\+ .*', lines[index + 1 + start_index + 1]) is not None and \
+                                             re.match(b'^@@ .*', lines[index + 1 + start_index + 2]) is not None
+                        if len(in_reply_to) != 0 and \
+                            not re.match('.*re:.*', subject, re.IGNORECASE) and \
+                            not patch_included:
                             subject = 'Re: ' + subject
                         break
                 message_id = next(next_line[len(b'Message-ID: '):].decode('utf-8').strip('<>')
