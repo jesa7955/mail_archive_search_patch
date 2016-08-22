@@ -124,7 +124,46 @@ class Spinics(GeneralList):
                     elif self.over:
                         return
 
-class RHInternal(GeneralList):
+class GzipArchived(GeneralList):
+    """ Base class for lists which provide downloadable gziped archive files """
+    def _parse_gz_archive(self, url, options):
+        try:
+            with urllib.request.urlopen(url) as gz_archive:
+                with gzip.open(gz_archive, 'r') as gz_file:
+                    lines = [line for line in gz_file.read().split(b'\n')]
+        except urllib.error.HTTPError:
+            print('URL {0} does not exist'.format(url))
+            self.emails = None
+            return
+        # Some archiver stores email address as "foo at bar.com" format
+        patterns  = [b'From ' + email.encode('utf-8')
+                     for email in options.email]
+        patterns += [b'From ' + email.replace('@', ' at ').encode('utf-8')
+                     for email in options.email]
+        for index, line in enumerate(lines):
+            if any(match in line for match in patterns):
+                subject_start = None
+                for index2, line2 in enumerate(lines[index + 1:]):
+                    if b'Subject: ' in line2:
+                        subject_start = index2
+                    elif re.match(b'^.*:.*', line2) and subject_start:
+                        subject_end = index2
+                        subject = b' '.join(item.strip() for item in lines[index + 1:][subject_start:subject_end]).decode('utf-8')[len('Subject: '):]
+                        break
+                message_id = next(next_line[len(b'Message-ID: '):].decode('utf-8').strip('<>')
+                                  for next_line in lines[index + 1:]
+                                  if b'Message-ID: ' in next_line)
+                date_info = next(next_line[len(b'Date: '):].decode('utf-8')
+                           for next_line in lines[index + 1:]
+                           if b'Date: ' in next_line)
+                if date_info.find('(') != -1:
+                    date_info = date_info[:date_info.find('(') - 1]
+                date = dateparser.parse(date_info)
+                if date:
+                    date = date.date()
+                self.emails[message_id] = (subject, str(date))
+
+class RHInternal(GzipArchived):
     """ Class for retrieving emails from internal Red Hat lists """
     url_base = 'http://post-office.corp.redhat.com/archives/'
 
@@ -135,24 +174,36 @@ class RHInternal(GeneralList):
                                              list_name,
                                              options.year,
                                              month)
-        try:
-            with urllib.request.urlopen(url) as gz_archive:
-                with gzip.open(gz_archive, 'r') as gz_file:
-                    lines = [line for line in gz_file.read().split(b'\n')]
-        except urllib.error.HTTPError:
-            print('URL {0} does not exist'.format(url))
-            self.emails = None
-            return
-        patterns = [b'From ' + email.encode('utf-8')
-                    for email in options.email]
-        for index, line in enumerate(lines):
-            if any(match in line for match in patterns):
-                subject = next(next_line[len('Subject: '):].decode('utf-8')
-                               for next_line in lines[index + 1:]
-                               if b'Subject: ' in next_line)
-                day = next(next_line[len('Date: day, '):].decode(
-                    'utf-8').split(' ')[0]
-                           for next_line in lines[index + 1:]
-                           if b'Date: ' in next_line)
-                date = '{0}.{1}.{2}'.format(day, options.month, options.year)
-                self.emails.append((subject, date))
+        super()._parse_gz_archive(url, options)
+
+class Pipermail(GzipArchived):
+    """ Class for retrieving emails from pipermail, default archiver of mailman 2 """
+    # Tested with lists from infradead.org
+    url_base = 'http://lists.infradead.org/pipermail/'
+
+    def _retrieve(self, options, list_name=None):
+        # Pipermail uses the same format as RHInternal archiver
+        month = datetime.date(options.year, options.month, 1).strftime('%B')
+        url = '{0}{1}/{2}-{3}.txt.gz'.format(self.url_base,
+                                           list_name,
+                                           options.year,
+                                           month)
+        super()._parse_gz_archive(url, options)
+
+class HyperKitty(GzipArchived):
+    """ Class for retrieving emails from HyperKitty, default archiver of mailman 3 """
+    url_base = 'https://lists.fedoraproject.org/archives/'
+
+    def _retrieve(self, options, list_name=None):
+        # Basic method is the same as pipermail and rh-internal
+        domain = self.url_base.split('/')[2]
+        month = str(options.month).zfill(2)
+        next_month = str(options.month + 1).zfill(2)
+        # Example: https://lists.fedoraproject.org/archives/list/kexec@lists.fedoraproject.org/export/kexec@lists.fedoraproject.org-2016-01.mbox.gz?start=2016-01-01&end=2016-02-01
+        url = '{0}list/{1}@{2}/export/{1}@{2}-{3}-{4}.mbox.gz?start={3}-{4}-01&end={3}-{5}-01'.format(self.url_base,
+                                                                                                      list_name,
+                                                                                                      domain,
+                                                                                                      options.year,
+                                                                                                      month,
+                                                                                                      next_month)
+        super()._parse_gz_archive(url, options)
