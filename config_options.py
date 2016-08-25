@@ -3,8 +3,9 @@
 import argparse
 import configparser
 import os
+import sys
 
-CONFIG = os.path.expanduser("~/.list_archive")
+CONFIG = os.path.expanduser("./config")
 
 
 class GeneralConfig(object):
@@ -13,13 +14,12 @@ class GeneralConfig(object):
         self.parser = None
         self.name = None
         self.email = None
-        self.lkml = None
-        self.rh_internal = None
-        self.pipermail = None
-        self.hyperkitty = None
-        self.spinics = None
         self.month = None
         self.year = None
+        self.lkml = []
+        self.spinics = []
+        self.pipermail = {}
+        self.hyperkitty = {}
         self._get_options(arguments)
 
     def _get_options(self, arguments=None):
@@ -32,8 +32,6 @@ class Config(GeneralConfig):
 
         try:
             self.parser.read_file(open(CONFIG))
-            self.month = int(self.parser['general']['month'])
-            self.year = int(self.parser['general']['year'])
             self.name = self.parser['general']['name']
             self.email = [mail.strip() for mail in
                           self.parser['general']['email'].split(',')]
@@ -41,12 +39,35 @@ class Config(GeneralConfig):
             print('Configuration file {0} not found'.format(CONFIG))
         except KeyError as key_not_found:
             print('{0} not configured in {1}'.format(key_not_found, CONFIG))
-        self.lkml = 'LKML' in self.parser.sections()
-        try:
-            self.rh_internal = [mailing_list.strip() for mailing_list in
-                                self.parser['RH']['lists'].split(',')]
-        except KeyError:
-            self.rh_internal = []
+
+        for section in self.parser.sections():
+            if section == 'general':
+                continue
+            elif section == 'lkml' or section == 'LKML':
+                self.lkml = True
+                continue
+            list_type = self.parser[section]['type']
+            list_names = self.parser[section]['listnames'].split()
+            if list_type == 'pipermail':
+                list_url = self.parser[section]['url']
+                self.pipermail.update({list_url: list_names})
+            elif list_type == 'hyperkitty':
+                list_url = self.parser[section]['url']
+                self.hyperkitty.update({list_url: list_names})
+            elif list_type == 'spinics':
+                self.spinics = list_names
+        if arguments is None:
+            return
+        self.parser = argparse.ArgumentParser()
+        self.parser.add_argument('--month')
+        self.parser.add_argument('--year')
+        opt, args = self.parser.parse_known_args(arguments)
+        if opt.month and opt.year:
+            self.month = int(opt.month)
+            self.year = int(opt.year)
+        else:
+            print("No year and month is specified")
+            sys.exit(1)
 
 class Options(GeneralConfig):
     """ Parse command line options """

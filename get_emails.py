@@ -127,6 +127,11 @@ class Spinics(GeneralList):
 
 class GzipArchived(GeneralList):
     """ Base class for lists which provide downloadable gziped archive files """
+    def __init__(self, options, url=None, list_name=None):
+        if url is not None:
+            self.url_base = url
+        super().__init__(options, list_name)
+
     def _parse_gz_archive(self, url, options):
         try:
             with urllib.request.urlopen(url) as gz_archive:
@@ -195,7 +200,6 @@ class RHInternal(GzipArchived):
 
 class Pipermail(GzipArchived):
     """ Class for retrieving emails from pipermail, default archiver of mailman 2 """
-    # Tested with lists from infradead.org
     url_base = 'http://lists.infradead.org/pipermail/'
 
     def _retrieve(self, options, list_name=None):

@@ -25,54 +25,53 @@ def main():
     Gather lists of all sent mails for given user during specified time and
     print them.
     """
-    options = config_options.Options(sys.argv[1:])
+    #options = config_options.Options(sys.argv[1:])
     # Email is set only if all needed options are specified
-    if options.email is None:
-        if len(sys.argv) > 1:
-            print('Falling back to configuration file')
+    #if options.email is None or \
+    #   options.name is None:
+    #    if len(sys.argv) > 1:
+    #        print('Falling back to configuration file')
         # Needed options in command are missing, use config
-        options = config_options.Config()
-        if options.email is None:
-            return
+    options = config_options.Config(sys.argv[1:])
+    if options.email is None or \
+       options.name is None or \
+       options.year is None or \
+       options.month is None:
+        return
 
-    #if options.lkml:
-    #    print_list(get_emails.LKML(options), 'LKML')
-    #for mailing_list in options.rh_internal:
-    #    print_list(get_emails.RHInternal(options, mailing_list), mailing_list)
-    #for mailing_list in options.pipermail:
-    #    print_list(get_emails.Pipermail(options, mailing_list), mailing_list)
-    #for mailing_list in options.hyperkitty:
-    #    print_list(get_emails.HyperKitty(options, mailing_list), mailing_list)
-    #for mailing_list in options.spinics:
-    #    print_list(get_emails.Spinics(options, mailing_list), mailing_list)
     emails = {}
     if options.lkml:
+        print("searching lkml")
         emails.update(get_emails.LKML(options).emails)
-    for mailing_list in options.rh_internal:
-        emails.update(get_emails.RHInternal(options, mailing_list).emails)
-    for mailing_list in options.pipermail:
-        emails.update(get_emails.Pipermail(options, mailing_list).emails)
-    for mailing_list in options.hyperkitty:
-        emails.update(get_emails.HyperKitty(options, mailing_list).emails)
-    for mailing_list in options.spinics:
-        emails.update(get_emails.Spinics(options, mailing_list).emails)
+    for url, mailing_lists in options.pipermail.items():
+        print("searching {0}".format(url))
+        for mailing_list in mailing_lists:
+            emails.update(get_emails.Pipermail(options, url, mailing_list).emails)
+    for url, mailing_lists in options.hyperkitty.items():
+        print("searching {0}".format(url))
+        for mailing_list in mailing_lists:
+            emails.update(get_emails.HyperKitty(options, url, mailing_list).emails)
+    if len(options.spinics) != 0:
+        print("searching spinics")
+        for mailing_list in options.spinics:
+            emails.update(get_emails.Spinics(options, mailing_list).emails)
 
     emails = [info for message_id, info in emails.items()]
     emails.sort(key=lambda tup: tup[1])
     print('{0} message(s) found'.format(len(emails)))
     patched = []
-    replyed = []
+    replied = []
     for message, date in emails:
         print('    {0}: {1}'.format(date, message))
-        if re.match('.*re:.*', message, re.IGNORECASE):
-            replyed.append((date, message))
+        if re.match('^re:.*|.*\sre:\s.*', message, re.IGNORECASE):
+            replied.append((date, message))
         elif re.match('.*\Wpatch\W.*', message, re.IGNORECASE):
             patched.append((date, message))
     print('{0} patched'.format(len(patched)))
     for date, message in patched:
         print('    {0}: {1}'.format(date, message))
-    print('{0} replyed'.format(len(replyed)))
-    for date, message in replyed:
+    print('{0} replied'.format(len(replied)))
+    for date, message in replied:
         print('    {0}: {1}'.format(date, message))
 
 if __name__ == '__main__':

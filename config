@@ -1,0 +1,24 @@
+[general]
+name = Baoquan He
+email = bhe@redhat.com
+
+[kexec internal]
+type = pipermail
+url = http://post-office.corp.redhat.com/archives/
+listnames = kexec-kdump-list
+
+[kexec upstream]
+type = pipermail
+url = http://lists.infradead.org/pipermail/
+listnames = kexec
+
+[kexec fedora]
+type = hyperkitty
+url = https://lists.fedoraproject.org/archives/
+listnames = kexec
+
+[linux initramfs]
+type = spinics
+listnames = linux-initramfs
+
+[lkml]
