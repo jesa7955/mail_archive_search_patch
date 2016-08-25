@@ -60,23 +60,19 @@ def main():
     emails = [info for message_id, info in emails.items()]
     emails.sort(key=lambda tup: tup[1])
     print('{0} message(s) found'.format(len(emails)))
+    patched = []
+    replyed = []
     for message, date in emails:
         print('    {0}: {1}'.format(date, message))
-    emails = [(date, message) for message, date in dict(emails[-1::-1]).items()]
-    emails.sort(key=lambda tup: tup[0])
-    patched = []
-    reviewed = []
-    for date, message in emails:
-        if re.match('.*\Wpatch\W.*', message, re.IGNORECASE):
-            if re.match('.*re:.*', message, re.IGNORECASE):
-                reviewed.append((date, message))
-            else:
-                patched.append((date, message))
+        if re.match('.*re:.*', message, re.IGNORECASE):
+            replyed.append((date, message))
+        elif re.match('.*\Wpatch\W.*', message, re.IGNORECASE):
+            patched.append((date, message))
     print('{0} patched'.format(len(patched)))
     for date, message in patched:
         print('    {0}: {1}'.format(date, message))
-    print('{0} reviewed'.format(len(reviewed)))
-    for date, message in reviewed:
+    print('{0} replyed'.format(len(replyed)))
+    for date, message in replyed:
         print('    {0}: {1}'.format(date, message))
 
 if __name__ == '__main__':

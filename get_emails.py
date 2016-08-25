@@ -61,7 +61,7 @@ class LKML(GeneralList):
             week_id += 1
 
 class Spinics(GeneralList):
-    """ Class for retrieving emails from mailing lists on verg.kernel.org """
+    """ Class for retrieving emails from www.spinics.com """
     url_base = 'http://www.spinics.net/lists/'
 
     def _retrieve(self, options, list_name=None):
