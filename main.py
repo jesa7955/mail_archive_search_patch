@@ -39,6 +39,7 @@ def main():
        options.month is None:
         return
 
+    # Ths dict's structure is {message-id: (subject, date)}
     emails = {}
     if options.lkml:
         emails.update(get_emails.LKML(options, "lkml").emails)
@@ -48,30 +49,47 @@ def main():
     for url, mailing_lists in options.hyperkitty.items():
         for mailing_list in mailing_lists:
             emails.update(get_emails.HyperKitty(options, url, mailing_list).emails)
-    if len(options.spinics) != 0:
-        for mailing_list in options.spinics:
-            emails.update(get_emails.Spinics(options, mailing_list).emails)
+    for mailing_list in options.spinics:
+        emails.update(get_emails.Spinics(options, mailing_list).emails)
 
     emails = [info for message_id, info in emails.items()]
+    # The tuple's structure is (subject, date)
     emails.sort(key=lambda tup: tup[1])
-    messages_count = len(emails)
-    patched = []
-    replied = []
+    patched, replied  = [], []
+    patched_count, replied_count = 0, 0
+    filtered_emails = {}
     print('Messages:')
-    for message, date in emails:
-        print ('    {0}: {1}'.format(date, message))
-        if re.match('^re:.*|.*\sre:\s.*', message, re.IGNORECASE):
-            replied.append((date, message))
-        elif re.match('.*\Wpatch\W.*', message, re.IGNORECASE):
-            patched.append((date, message))
+    for subject, date in emails:
+        if subject in filtered_emails:
+            filtered_emails[subject][1] += 1
+        else:
+            filtered_emails[subject] = [date, 1]
+        if re.match('^re:.*|.*\sre:\s.*', subject, re.IGNORECASE):
+            replied_count += 1
+        elif re.match('.*\Wpatch\W.*', subject, re.IGNORECASE):
+            patched_count += 1
+    for subject, (date, count) in filtered_emails.items():
+        if count == 1:
+            print ('{0:<8} {1} {2}'.format(' ', date, subject))
+        else:
+            print ('{0:<8} {1} {2}'.format(str(count).join(("[", "]")), date, subject))
+        if re.match('^re:.*|.*\sre:\s.*', subject, re.IGNORECASE):
+            replied.append((count, date, subject))
+        elif re.match('.*\Wpatch\W.*', subject, re.IGNORECASE):
+            patched.append((count, date, subject))
     print('Patches:')
-    for date, message in patched:
-        print('    {0}: {1}'.format(date, message))
+    for count, date, subject in patched:
+        if count == 1:
+            print ('{0:<8} {1} {2}'.format(' ', date, subject))
+        else:
+            print ('{0:<8} {1} {2}'.format(str(count).join(("[", "]")), date, subject))
     print('Replied:')
-    for date, message in replied:
-        print('    {0}: {1}'.format(date, message))
-
-    print('{0} message(s) found, {1} patched, {2} replied'.format(len(emails), len(patched), len(replied)))
+    for count, date, subject in replied:
+        if count == 1:
+            print ('{0:<8} {1} {2}'.format(' ', date, subject))
+        else:
+            print ('{0:<8} {1} {2}'.format(str(count).join(("[", "]")), date, subject))
+    print('{0} message(s) found, {1} patched, {2} replied'.format(len(emails), patched_count, replied_count))
 
 if __name__ == '__main__':
     main()
