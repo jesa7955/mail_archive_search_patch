@@ -8,13 +8,12 @@ import re
 import sys
 
 
-def print_list(mails, list_name):
+def print_email(count, date, subject):
     # Differentiate between nonexistent mailing list and no found emails
-    if mails.emails:
-        print('{0} messages found in {1}'.format(len(mails.emails), list_name))
-        for message, date in mails.emails:
-            print('    {0}: {1}'.format(date, message))
-        print()
+    if count == 1:
+        print ('{0:>8} {1} {2}'.format(' ', date, subject))
+    else:
+        print ('{0:>8} {1} {2}'.format(str(count).join(("[", "]")), date, subject))
 
 def main():
     """
@@ -64,31 +63,22 @@ def main():
             filtered_emails[subject][1] += 1
         else:
             filtered_emails[subject] = [date, 1]
-        if re.match('^re:.*|.*\sre:\s.*', subject, re.IGNORECASE):
-            replied_count += 1
-        elif re.match('.*\Wpatch\W.*', subject, re.IGNORECASE):
-            patched_count += 1
-    for subject, (date, count) in filtered_emails.items():
-        if count == 1:
-            print ('{0:<8} {1} {2}'.format(' ', date, subject))
-        else:
-            print ('{0:<8} {1} {2}'.format(str(count).join(("[", "]")), date, subject))
+    filtered_emails = [(count, date, subject) for subject, (date, count) in filtered_emails.items()]
+    filtered_emails.sort(key=lambda tup: tup[1])
+    for count, date, subject in filtered_emails:
+        print_email(count, date, subject)
         if re.match('^re:.*|.*\sre:\s.*', subject, re.IGNORECASE):
             replied.append((count, date, subject))
+            replied_count += count
         elif re.match('.*\Wpatch\W.*', subject, re.IGNORECASE):
             patched.append((count, date, subject))
+            patched_count += count
     print('Patches:')
     for count, date, subject in patched:
-        if count == 1:
-            print ('{0:<8} {1} {2}'.format(' ', date, subject))
-        else:
-            print ('{0:<8} {1} {2}'.format(str(count).join(("[", "]")), date, subject))
+        print_email(count, date, subject)
     print('Replied:')
     for count, date, subject in replied:
-        if count == 1:
-            print ('{0:<8} {1} {2}'.format(' ', date, subject))
-        else:
-            print ('{0:<8} {1} {2}'.format(str(count).join(("[", "]")), date, subject))
+        print_email(count, date, subject)
     print('{0} message(s) found, {1} patched, {2} replied'.format(len(emails), patched_count, replied_count))
 
 if __name__ == '__main__':

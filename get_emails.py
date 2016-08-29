@@ -188,7 +188,7 @@ class GzipArchived(GeneralList):
                 self.emails[message_id] = (subject, str(date))
 
 class RHInternal(GzipArchived):
-    """ Class for retrieving emails from internal Red Hat lists """
+    """ Class for retrieving emails from internal Red Hat lists(deprecated) """
     url_base = 'http://post-office.corp.redhat.com/archives/'
 
     def _retrieve(self, options, list_name=None):
