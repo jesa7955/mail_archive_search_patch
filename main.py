@@ -41,7 +41,7 @@ def main():
 
     emails = {}
     if options.lkml:
-        emails.update(get_emails.LKML(options, "LKML").emails)
+        emails.update(get_emails.LKML(options, "lkml").emails)
     for url, mailing_lists in options.pipermail.items():
         for mailing_list in mailing_lists:
             emails.update(get_emails.Pipermail(options, url, mailing_list).emails)
@@ -57,7 +57,7 @@ def main():
     messages_count = len(emails)
     patched = []
     replied = []
-    print('Messages Be Found:')
+    print('Messages:')
     for message, date in emails:
         print ('    {0}: {1}'.format(date, message))
         if re.match('^re:.*|.*\sre:\s.*', message, re.IGNORECASE):

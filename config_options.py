@@ -5,8 +5,8 @@ import configparser
 import os
 import sys
 
-CONFIG = os.path.expanduser("./config")
-
+CONFIG_GLOBAL = os.path.expanduser("~/.list_archive")
+CONFIG_LOCAL = os.path.expanduser("./config")
 
 class GeneralConfig(object):
     """ General option class """
@@ -26,19 +26,29 @@ class GeneralConfig(object):
         raise NotImplementedError
 
 class Config(GeneralConfig):
-    """ Parse configuration file if command options are missing """
+    """ Parse configuration file and command line arguments """
     def _get_options(self, arguments=None):
         self.parser = configparser.ConfigParser()
 
         try:
-            self.parser.read_file(open(CONFIG))
+            self.parser.read_file(open(CONFIG_GLOBAL))
+            CONFIG = CONFIG_GLOBAL
+        except FileNotFoundError:
+            print('No configuration file {0} was found, searching in the current path'.format(CONFIG_GLOBAL), file=sys.stderr)
+            try:
+                self.parser.read_file(open(CONFIG_LOCAL))
+                CONFIG = CONFIG_LOCAL
+            except FileNotFoundError:
+                print('Configuration file {0} not found, exiting...'.format(CONFIG_LOCAL), file=sys.stderr)
+                sys.exit(1)
+        print('Using configuration file {0}'.format(CONFIG), file=sys.stderr)
+        try:
             self.name = self.parser['general']['name']
             self.email = [mail.strip() for mail in
-                          self.parser['general']['email'].split(',')]
-        except FileNotFoundError:
-            print('Configuration file {0} not found'.format(CONFIG))
+                          self.parser['general']['email'].split()]
         except KeyError as key_not_found:
-            print('{0} not configured in {1}'.format(key_not_found, CONFIG))
+            print('{0} not configured in {1}'.format(key_not_found, CONFIG), file=std.stderr)
+            sys.exit(1)
 
         for section in self.parser.sections():
             if section == 'general':
@@ -70,7 +80,7 @@ class Config(GeneralConfig):
             sys.exit(1)
 
 class Options(GeneralConfig):
-    """ Parse command line options """
+    """ Parse command line options(deprecated) """
     def _get_options(self, arguments=None):
         self.parser = argparse.ArgumentParser()
         self.parser.add_argument('--name')
