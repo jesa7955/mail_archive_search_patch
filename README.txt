@@ -8,3 +8,8 @@ Example command:
 --hyperkitty "kexec" means fedora's kexec list
 --spinics is one of the archives of vger.kernel.org's lists
 
+#TODO
+#1. output result at last
+2. statics the number of the same name reply
+#3. process
+4. the location config file

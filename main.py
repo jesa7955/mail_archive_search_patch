@@ -41,38 +41,37 @@ def main():
 
     emails = {}
     if options.lkml:
-        print("searching lkml")
-        emails.update(get_emails.LKML(options).emails)
+        emails.update(get_emails.LKML(options, "LKML").emails)
     for url, mailing_lists in options.pipermail.items():
-        print("searching {0}".format(url))
         for mailing_list in mailing_lists:
             emails.update(get_emails.Pipermail(options, url, mailing_list).emails)
     for url, mailing_lists in options.hyperkitty.items():
-        print("searching {0}".format(url))
         for mailing_list in mailing_lists:
             emails.update(get_emails.HyperKitty(options, url, mailing_list).emails)
     if len(options.spinics) != 0:
-        print("searching spinics")
         for mailing_list in options.spinics:
             emails.update(get_emails.Spinics(options, mailing_list).emails)
 
     emails = [info for message_id, info in emails.items()]
     emails.sort(key=lambda tup: tup[1])
-    print('{0} message(s) found'.format(len(emails)))
+    messages_count = len(emails)
     patched = []
     replied = []
+    print('Messages Be Found:')
     for message, date in emails:
-        print('    {0}: {1}'.format(date, message))
+        print ('    {0}: {1}'.format(date, message))
         if re.match('^re:.*|.*\sre:\s.*', message, re.IGNORECASE):
             replied.append((date, message))
         elif re.match('.*\Wpatch\W.*', message, re.IGNORECASE):
             patched.append((date, message))
-    print('{0} patched'.format(len(patched)))
+    print('Patches:')
     for date, message in patched:
         print('    {0}: {1}'.format(date, message))
-    print('{0} replied'.format(len(replied)))
+    print('Replied:')
     for date, message in replied:
         print('    {0}: {1}'.format(date, message))
+
+    print('{0} message(s) found, {1} patched, {2} replied'.format(len(emails), len(patched), len(replied)))
 
 if __name__ == '__main__':
     main()

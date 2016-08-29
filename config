@@ -1,6 +1,6 @@
 [general]
-name = Baoquan He
-email = bhe@redhat.com
+name = Name
+email = Email
 
 [kexec internal]
 type = pipermail

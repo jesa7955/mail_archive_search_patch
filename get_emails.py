@@ -4,6 +4,7 @@ import calendar
 import datetime
 import gzip
 import re
+import sys
 import urllib.request
 import dateparser
 
@@ -13,6 +14,7 @@ class GeneralList(object):
 
     def __init__(self, options, list_name=None):
         self.emails = {}
+        print("Search {0} From {1}".format(list_name, self.url_base), file=sys.stderr)
         self._retrieve(options, list_name)
 
     def _retrieve(self, options, list_name=None):
