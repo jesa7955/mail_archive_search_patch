@@ -103,7 +103,7 @@ class Spinics(GeneralList):
 
     def _search_in_page(self, page, list_name, patterns, date_range):
         lines = page.split(b'<li><strong>')
-        # Magic number stores infomation we need
+        # Magic index point to the member which stores infomation we need
         for line in lines[1:]:
             item = re.split('[<>]', line.decode('utf-8'))
             if any(match in item[14] for match in patterns):
@@ -150,36 +150,41 @@ class GzipArchived(GeneralList):
                      for email in options.email]
         for index, line in enumerate(lines):
             if any(match in line for match in patterns):
-                subject_start = None
+                # Sometimes a subject may be splited into multiple lines
+                subject_start, subject_end = None, None
                 for index2, line2 in enumerate(lines[index + 1:]):
-                    if b'Subject: ' in line2:
+                    if re.match(b'^Subject: .*', line2) and \
+                       subject_end is None:
                         subject_start = index2
-                    elif re.match(b'^.*:.*', line2) and subject_start:
+                    elif re.match(b'^.*:\s.*', line2) and \
+                         subject_start is not None:
                         subject_end = index2
                         subject = b' '.join(item.strip() for item in lines[index + 1:][subject_start:subject_end]).\
                                                                                   decode('utf-8')[len('Subject: '):]
-                        break
-                for index2, line2 in enumerate(lines[index + 1:]):
-                    if re.match(b'^From .*', line2):
-                        in_reply_to = [next_line for next_line in lines[index + 1:index + 1 + index2]
-                                       if re.match(b'^In-Reply-To: .*', next_line)]
+                        subject_start = None
+                    elif re.match(b'^From\s.*', line2) or \
+                         index2 == len(lines[index + 1:]) - 1:
+                        in_reply_to = False
+                        for next_line in lines[index + 1:index + 1 + index2]:
+                            if re.match(b'^In-Reply-To: .*', next_line, re.IGNORECASE):
+                                in_reply_to = True
+                            if re.match(b'^Message-ID: .*', next_line, re.IGNORECASE):
+                                message_id = next_line[len(b'Message-ID: '):].decode().strip('<>')
+                            elif re.match(b'^Date: .*', next_line, re.IGNORECASE):
+                                date_info = next_line[len(b'Date: '):].decode()
                         patch_start = [start_index for start_index, start_line in enumerate(lines[index + 1:index + 1 + index2])
                                                        if re.match(b'^--- .*', start_line)]
                         patch_included = False
                         for start_index in patch_start:
-                            patch_included = re.match(b'^\+\+\+ .*', lines[index + 1 + start_index + 1]) is not None and \
-                                             re.match(b'^@@ .*', lines[index + 1 + start_index + 2]) is not None
-                        if len(in_reply_to) != 0 and \
-                            not re.match('.*re:.*', subject, re.IGNORECASE) and \
-                            not patch_included:
+                            if index + 1 + start_index + 2 < len(lines):
+                                patch_included = re.match(b'^\+\+\+ .*', lines[index + 1 + start_index + 1]) is not None and \
+                                                 re.match(b'^@@ .*', lines[index + 1 + start_index + 2]) is not None or \
+                                                 patch_included
+                        if in_reply_to and \
+                           not re.match('^re:.*|.*\sre:\s.*', subject, re.IGNORECASE) and \
+                           not patch_included:
                             subject = 'Re: ' + subject
                         break
-                message_id = next(next_line[len(b'Message-ID: '):].decode('utf-8').strip('<>')
-                                  for next_line in lines[index + 1:]
-                                  if b'Message-ID: ' in next_line)
-                date_info = next(next_line[len(b'Date: '):].decode('utf-8')
-                           for next_line in lines[index + 1:]
-                           if b'Date: ' in next_line)
                 if date_info.find('(') != -1:
                     date_info = date_info[:date_info.find('(') - 1]
                 date = dateparser.parse(date_info)

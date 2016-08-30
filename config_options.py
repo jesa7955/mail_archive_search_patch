@@ -48,7 +48,6 @@ class Config(GeneralConfig):
                           self.parser['general']['email'].split()]
         except KeyError as key_not_found:
             print('{0} not configured in {1}'.format(key_not_found, CONFIG), file=std.stderr)
-            sys.exit(1)
 
         for section in self.parser.sections():
             if section == 'general':
@@ -71,12 +70,24 @@ class Config(GeneralConfig):
         self.parser = argparse.ArgumentParser()
         self.parser.add_argument('--month')
         self.parser.add_argument('--year')
+        self.parser.add_argument('--name')
+        self.parser.add_argument('--email')
         opt, args = self.parser.parse_known_args(arguments)
+        # Override name and email in the configuration file if specified in command line
+        if opt.name and opt.email:
+            self.name = opt.name
+            self.email = opt.email.split()
+        # Exit if no year or month is specified
         if opt.month and opt.year:
             self.month = int(opt.month)
             self.year = int(opt.year)
         else:
-            print("No year and month is specified")
+            print("No year or month is specified", file=sys.stderr)
+            sys.exit(1)
+        # Exit if no name or email is specified
+        if self.name is None or \
+           self.email is None:
+            print("No name or email is specified", file=sys.stderr)
             sys.exit(1)
 
 class Options(GeneralConfig):

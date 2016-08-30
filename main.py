@@ -38,6 +38,7 @@ def main():
        options.month is None:
         return
 
+    print('Searching for {0} <{1}>'.format(options.name, str(options.email).strip('[]')), file=sys.stderr)
     # Ths dict's structure is {message-id: (subject, date)}
     emails = {}
     if options.lkml:
@@ -52,8 +53,6 @@ def main():
         emails.update(get_emails.Spinics(options, mailing_list).emails)
 
     emails = [info for message_id, info in emails.items()]
-    # The tuple's structure is (subject, date)
-    emails.sort(key=lambda tup: tup[1])
     patched, replied  = [], []
     patched_count, replied_count = 0, 0
     filtered_emails = {}
