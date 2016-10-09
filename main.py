@@ -70,9 +70,7 @@ def main():
             filtered_emails.items()]
     filtered_emails.sort(key=lambda tup: tup[1])
     # Output result
-    print('Messages:')
     for count, date, subject in filtered_emails:
-        print_email(count, date, subject)
         if re.match('^re:.*|.*\sre:\s.*', subject, re.IGNORECASE):
             replied.append((count, date, subject))
             replied_count += count
@@ -86,7 +84,7 @@ def main():
         else:
             others.append((count, date, subject))
             others_count += count
-    print('Patched:')
+    print('Patches:')
     for count, date, subject in patched:
         print_email(count, date, subject)
     print('Replied:')
@@ -95,7 +93,7 @@ def main():
     print('Others:')
     for count, date, subject in others:
         print_email(count, date, subject)
-    print("{0} message(s) found, {1} patched, {2} replied, {3} others".format(
+    print("{} meesages founded, {} patches, {} replied, {} others".format(
                         len(emails), patched_count,
                         replied_count, others_count))
 

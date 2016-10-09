@@ -193,7 +193,6 @@ class GzipArchived(GeneralList):
                     elif re.match(b'^\S*:\s.*', line2) and \
                             subject_start is not None:
                         subject_end = index2
-                        print(lines[index + 1:][subject_start:subject_end])
                         subject = b' '.join(
                                 item.strip() for item in
                                 lines[index + 1:][subject_start:subject_end])
