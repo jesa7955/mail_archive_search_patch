@@ -74,15 +74,15 @@ def main():
     for count, date, subject in filtered_emails:
         print_email(count, date, subject)
         if re.match('^re:.*|.*\sre:\s.*', subject, re.IGNORECASE):
+            replied.append((count, date, subject))
+            replied_count += count
+        elif re.match('.*\Wpatch\W.*', subject, re.IGNORECASE):
             if re.match('.*0\/\d.*', subject, re.IGNORECASE):
                 others.append((count, date, subject))
                 others_count += count
             else:
-                replied.append((count, date, subject))
-                replied_count += count
-        elif re.match('.*\Wpatch\W.*', subject, re.IGNORECASE):
-            patched.append((count, date, subject))
-            patched_count += count
+                patched.append((count, date, subject))
+                patched_count += count
         else:
             others.append((count, date, subject))
             others_count += count
