@@ -33,8 +33,7 @@ class GeneralList(object):
                 print("{} is not found".format(url), file=sys.stderr)
             return (None, "not_found")
         except urllib.error.URLError:
-            if self._debug:
-                print("{} is not accessable".format(url), file=sys.stderr)
+            print("{} is not accessable".format(url), file=sys.stderr)
             return (None, 'unaccessable')
 
 
@@ -125,7 +124,6 @@ class Spinics(GeneralList):
             page = page.read()
             self._search_in_page(page, list_name, patterns, date_range)
         elif page[1] == 'not_found':
-            self.emails = None
             return
 
         # Search in the rest ones
@@ -201,7 +199,6 @@ class GzipArchived(GeneralList):
             with gzip.open(gz_archive, 'r') as gz_file:
                 lines = [line for line in gz_file.read().split(b'\n')]
         else:
-            self.emails = None
             return
         # Some archiver stores email address as "foo at bar.com" format
         # Examples kexec upstream and kexec-fedora
@@ -290,7 +287,7 @@ class RHInternal(GzipArchived):
                                              list_name,
                                              options.year,
                                              month)
-        super()._parse_gz_archive(url, options)
+        self._parse_gz_archive(url, options)
 
 
 class Pipermail(GzipArchived):
@@ -306,7 +303,7 @@ class Pipermail(GzipArchived):
                                              list_name,
                                              options.year,
                                              month)
-        super()._parse_gz_archive(url, options)
+        self._parse_gz_archive(url, options)
 
 
 class HyperKitty(GzipArchived):
@@ -327,4 +324,4 @@ class HyperKitty(GzipArchived):
                                                          options.year,
                                                          month,
                                                          next_month)
-        super()._parse_gz_archive(url, options)
+        self._parse_gz_archive(url, options)
