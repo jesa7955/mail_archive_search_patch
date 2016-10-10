@@ -41,18 +41,19 @@ def main():
     # Ths dict's structure is {message-id: (subject, date)}
     emails = {}
     if options.lkml:
-        emails.update(get_emails.LKML(options, "lkml").emails)
+        emails.update(get_emails.LKML(options, "lkml",
+                                      debug=options.debug).emails)
     for url, mailing_lists in options.pipermail.items():
         for mailing_list in mailing_lists:
             emails.update(get_emails.Pipermail(
-                options, url, mailing_list).emails)
+                options, url, mailing_list, debug=options.debug).emails)
     for url, mailing_lists in options.hyperkitty.items():
         for mailing_list in mailing_lists:
             emails.update(get_emails.HyperKitty(
-                options, url, mailing_list).emails)
+                options, url, mailing_list, debug=options.debug).emails)
     for mailing_list in options.spinics:
         emails.update(get_emails.Spinics(
-            options, mailing_list).emails)
+            options, mailing_list, debug=options.debug).emails)
     emails = [info for message_id, info in emails.items()]
     patched, replied, others = [], [], []
     patched_count, replied_count, others_count = 0, 0, 0
@@ -93,7 +94,7 @@ def main():
     print('Others:')
     for count, date, subject in others:
         print_email(count, date, subject)
-    print("{} meesages founded, {} patches, {} replied, {} others".format(
+    print("{} meesages found, {} patches, {} replied, {} others".format(
                         len(emails), patched_count,
                         replied_count, others_count))
 

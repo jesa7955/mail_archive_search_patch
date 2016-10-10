@@ -8,6 +8,7 @@ import sys
 CONFIG_GLOBAL = os.path.expanduser("~/.list_archive")
 CONFIG_LOCAL = os.path.expanduser("./config")
 
+
 class GeneralConfig(object):
     """ General option class """
     def __init__(self, arguments=None):
@@ -16,6 +17,7 @@ class GeneralConfig(object):
         self.email = None
         self.month = None
         self.year = None
+        self.debug = False
         self.lkml = []
         self.spinics = []
         self.pipermail = {}
@@ -24,6 +26,7 @@ class GeneralConfig(object):
 
     def _get_options(self, arguments=None):
         raise NotImplementedError
+
 
 class Config(GeneralConfig):
     """ Parse configuration file and command line arguments """
@@ -34,12 +37,15 @@ class Config(GeneralConfig):
             self.parser.read_file(open(CONFIG_GLOBAL))
             CONFIG = CONFIG_GLOBAL
         except FileNotFoundError:
-            print('No configuration file {0} was found, searching in the current path'.format(CONFIG_GLOBAL), file=sys.stderr)
+            print('No configuration file {0} was found, '
+                  'searching in the current path'.format(CONFIG_GLOBAL),
+                  file=sys.stderr)
             try:
                 self.parser.read_file(open(CONFIG_LOCAL))
                 CONFIG = CONFIG_LOCAL
             except FileNotFoundError:
-                print('Configuration file {0} not found, exiting...'.format(CONFIG_LOCAL), file=sys.stderr)
+                print('Configuration file {0} not found, '
+                      'exiting...'.format(CONFIG_LOCAL), file=sys.stderr)
                 sys.exit(1)
         print('Using configuration file {0}'.format(CONFIG), file=sys.stderr)
         try:
@@ -47,7 +53,8 @@ class Config(GeneralConfig):
             self.email = [mail.strip() for mail in
                           self.parser['general']['email'].split()]
         except KeyError as key_not_found:
-            print('{0} not configured in {1}'.format(key_not_found, CONFIG), file=std.stderr)
+            print('{0} not configured in {1}'.format(key_not_found,
+                                                     CONFIG), file=std.stderr)
 
         for section in self.parser.sections():
             if section == 'general':
@@ -72,8 +79,10 @@ class Config(GeneralConfig):
         self.parser.add_argument('--year')
         self.parser.add_argument('--name')
         self.parser.add_argument('--email')
+        self.parser.add_argument('-d', '--debug', action='store_true')
         opt, args = self.parser.parse_known_args(arguments)
-        # Override name and email in the configuration file if specified in command line
+        # Override name and email in the configuration file if
+        # specified in command line
         if opt.name and opt.email:
             self.name = opt.name
             self.email = opt.email.split()
@@ -84,11 +93,14 @@ class Config(GeneralConfig):
         else:
             print("No year or month is specified", file=sys.stderr)
             sys.exit(1)
+        if opt.debug:
+            self.debug = True
         # Exit if no name or email is specified
         if self.name is None or \
            self.email is None:
             print("No name or email is specified", file=sys.stderr)
             sys.exit(1)
+
 
 class Options(GeneralConfig):
     """ Parse command line options(deprecated) """

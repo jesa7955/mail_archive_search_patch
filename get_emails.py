@@ -12,14 +12,30 @@ import dateparser
 class GeneralList(object):
     """ General list class """
 
-    def __init__(self, options, list_name=None):
+    def __init__(self, options, list_name=None, debug=False, timeout=10):
         self.emails = {}
         print("Searching {0} From {1}".format(
             list_name, self.url_base), file=sys.stderr)
+        self._debug = debug
+        self._timeout = timeout
         self._retrieve(options, list_name)
 
     def _retrieve(self, options, list_name=None):
         raise NotImplementedError
+
+    def _fetch_url(self, url):
+        if self._debug:
+            print("Fetching {}".format(url), file=sys.stderr)
+        try:
+            return urllib.request.urlopen(url, timeout=self._timeout)
+        except urllib.error.HTTPError:
+            if self._debug:
+                print("{} is not found".format(url), file=sys.stderr)
+            return (None, "not_found")
+        except urllib.error.URLError:
+            if self._debug:
+                print("{} is not accessable".format(url), file=sys.stderr)
+            return (None, 'unaccessable')
 
 
 class LKML(GeneralList):
@@ -35,18 +51,23 @@ class LKML(GeneralList):
             patterns.append('{0} &lt;{1}@{2}&gt;'.format(
                 options.name, email_user, 'x' * len(email_domain)))
         # This archiver stores emails in week-based period
-        week_id = 0
+        week_id = -1
         first_day = datetime.date(options.year, options.month, 1)
+        last_day = datetime.date(options.year, (options.month + 1) % 12, 1)
         while True:
+            week_id += 1
             url = '{0}{1}{2}.{3}/author.html'.format(
                     self.url_base,
                     options.year % 100,
                     str(options.month).zfill(2),
                     week_id)
-            try:
-                lines = urllib.request.urlopen(url).readlines()
-            except urllib.error.HTTPError:
-                return
+            page = self._fetch_url(url)
+            if type(page) == tuple:
+                if page[1] == 'not_found':
+                    return
+                else:
+                    continue
+            lines = page.readlines()
             threads = []
             for index, line in enumerate(lines):
                 if options.name.encode('utf-8') in line:
@@ -58,13 +79,16 @@ class LKML(GeneralList):
             for thread in threads:
                 item = re.split('[<>]', thread.decode('utf-8'))
                 subject, date = item[8], dateparser.parse(item[14]).date()
-                if date < first_day:
+                if date < first_day or date >= last_day:
                     continue
                 detail_url = '{0}{1}'.format(
                         url[:-len('author.html')],
                         item[7].split()[-1].split("=")[-1].strip('"'))
-                detail_lines = urllib.request.urlopen(detail_url).\
-                    read().decode('utf-8').split("\n")
+                d_page = self._fetch_url(detail_url)
+                if type(d_page) != tuple:
+                    detail_lines = d_page.read().decode('utf-8').split("\n")
+                else:
+                    continue
                 for line in detail_lines:
                     if 'X-Message-Id:' in line:
                         m_id_start = len('<!--X-Message-Id: ')
@@ -74,7 +98,6 @@ class LKML(GeneralList):
                     if any(match in line for match in patterns):
                         self.emails[message_id] = (subject, str(date))
                         break
-            week_id += 1
 
 
 class Spinics(GeneralList):
@@ -97,11 +120,11 @@ class Spinics(GeneralList):
         # Search for match in the first page
         first_url = '{0}{1}/maillist.html'.format(self.url_base,
                                                   list_name,)
-        try:
-            page = urllib.request.urlopen(first_url).read()
+        page = self._fetch_url(first_url)
+        if type(page) != tuple:
+            page = page.read()
             self._search_in_page(page, list_name, patterns, date_range)
-        except urllib.error.HTTPError:
-            print('URL {0} does not exist'.format(first_url))
+        elif page[1] == 'not_found':
             self.emails = None
             return
 
@@ -111,11 +134,12 @@ class Spinics(GeneralList):
             current_url = '{0}{1}/mail{2}.html'.format(self.url_base,
                                                        list_name,
                                                        url_id)
-            try:
-                page = urllib.request.urlopen(current_url).read()
+            page = self._fetch_url(current_url)
+            if type(page) != tuple:
+                page = page.read()
                 if not self.over:
                     self._search_in_page(page, list_name, patterns, date_range)
-            except urllib.error.HTTPError:
+            else:
                 break
             url_id += 1
 
@@ -131,8 +155,11 @@ class Spinics(GeneralList):
                                                  list_name,
                                                  herf)
 
-                detail_page = urllib.request.urlopen(detail_url)
-                detail_lines = detail_page.read().split(b'\n')
+                detail_page = self._fetch_url(detail_url)
+                if type(detail_page) != tuple:
+                    detail_lines = detail_page.read().split(b'\n')
+                else:
+                    continue
                 message_id, date = None, None
                 for line in detail_lines:
                     if b'X-Date:' in line:
@@ -161,19 +188,19 @@ class GzipArchived(GeneralList):
     """
     Base class for lists which provide downloadable gziped archvie files
     """
-    def __init__(self, options, url=None, list_name=None):
+    def __init__(self, options, url=None, list_name=None, debug=False,
+                 timeout=10):
         if url is not None:
             self.url_base = url
-        super().__init__(options, list_name)
+        super().__init__(options, list_name, debug, timeout)
 
     def _parse_gz_archive(self, url, options):
         """ Method used to parse information from gziped archive """
-        try:
-            with urllib.request.urlopen(url) as gz_archive:
-                with gzip.open(gz_archive, 'r') as gz_file:
-                    lines = [line for line in gz_file.read().split(b'\n')]
-        except urllib.error.HTTPError:
-            print('URL {0} does not exist'.format(url))
+        gz_archive = self._fetch_url(url)
+        if type(gz_archive) != tuple:
+            with gzip.open(gz_archive, 'r') as gz_file:
+                lines = [line for line in gz_file.read().split(b'\n')]
+        else:
             self.emails = None
             return
         # Some archiver stores email address as "foo at bar.com" format
@@ -235,8 +262,8 @@ class GzipArchived(GeneralList):
                                     patch_included
                         # Some archives don't include 'Re:' for replies
                         re_included = re.match('^re:.*|.*\sre:\s.*',
-                                                   subject,
-                                                   re.IGNORECASE)
+                                               subject,
+                                               re.IGNORECASE)
                         if in_reply_to and \
                            not re_included and \
                            not patch_included:
