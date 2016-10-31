@@ -5,7 +5,7 @@ email = Email
 [kexec internal]
 type = pipermail
 url = http://post-office.corp.redhat.com/archives/
-listnames = kexec-kdump-list
+listnames = kexec-kdump-list rhkernel-list
 
 [kexec upstream]
 type = pipermail

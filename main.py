@@ -35,8 +35,8 @@ def main():
         return
     # Start searching
     searching_email = ' '.join(
-            email.strip("'") for email in options.email)
-    print('Searching for {0} <{1}>'.format(
+            '<' + email.strip("'") + '>' for email in options.email)
+    print('Searching for {} {}'.format(
         options.name, searching_email), file=sys.stderr)
     # Ths dict's structure is {message-id: (subject, date)}
     emails = {}
