@@ -53,6 +53,10 @@ class LKML(GeneralList):
         week_id = -1
         first_day = datetime.date(options.year, options.month, 1)
         last_day = datetime.date(options.year, (options.month + 1) % 12, 1)
+        if options.month == 12:
+            last_day = datetime.date(options.year+1, 1, 1)
+        else:
+            last_day = datetime.date(options.year, options.month + 1, 1)
         while True:
             week_id += 1
             url = '{0}{1}{2}.{3}/author.html'.format(
