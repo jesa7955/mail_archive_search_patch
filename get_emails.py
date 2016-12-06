@@ -7,6 +7,43 @@ import re
 import sys
 import urllib.request
 import dateparser
+from html.parser import HTMLParser
+
+
+class SpinicsHTMLParser(HTMLParser):
+    in_li = False
+    inner_li = False
+    has_attrs = False
+    thread_list = []
+    cur = {}
+    def handle_starttag(self, tag, attrs):
+        if tag == 'li':
+            if not self.in_li:
+                self.in_li = True
+            else:
+                self.inner_li = True
+        elif tag == 'a' and self.in_li and len(attrs) > 1:
+            self.has_attrs = True
+            self.cur = {}
+            self.cur['attrs'] = attrs
+        elif tag == 'html':
+            self.thread_list = []
+
+    def handle_endtag(self, tag):
+        if tag == 'li':
+            if self.inner_li:
+                self.inner_li = False
+            else:
+                self.in_li = False
+                self.has_attrs = False
+
+    def handle_data(self, data):
+        if self.in_li:
+            if self.inner_li and data != "From":
+                self.cur['email'] = data.strip(": ")
+                self.thread_list.append(self.cur)
+            elif data != "From" and not data.isspace() and self.has_attrs:
+                self.cur['subject'] = data
 
 
 class GeneralList(object):
@@ -52,7 +89,6 @@ class LKML(GeneralList):
         # This archiver stores emails in week-based period
         week_id = -1
         first_day = datetime.date(options.year, options.month, 1)
-        last_day = datetime.date(options.year, (options.month + 1) % 12, 1)
         if options.month == 12:
             last_day = datetime.date(options.year+1, 1, 1)
         else:
@@ -106,20 +142,23 @@ class LKML(GeneralList):
 class Spinics(GeneralList):
     """ Class for retrieving emails from www.spinics.com """
     url_base = 'http://www.spinics.net/lists/'
+    over = False
+    parser = SpinicsHTMLParser()
 
     def _retrieve(self, options, list_name=None):
-        self.over = False
         # Pattern is the same as LKML's one
         patterns = []
         for email in options.email:
             email_user, email_domain = re.split('@', email)
-            patterns.append('{0} &lt;{1}@{2}&gt;'.format(
+            patterns.append('{0} <{1}@{2}>'.format(
                 options.name, email_user, 'x' * len(email_domain)))
         # The range of the dates we want to search
-        date_range = [
-                day for day in
-                calendar.Calendar().itermonthdates(options.year, options.month)
-                if day.month == options.month]
+        first_day = datetime.date(options.year, options.month, 1)
+        if options.month == 12:
+            last_day = datetime.date(options.year+1, 1, 1)
+        else:
+            last_day = datetime.date(options.year, options.month + 1, 1)
+        date_range = (first_day, last_day)
         # Search for match in the first page
         first_url = '{0}{1}/maillist.html'.format(self.url_base,
                                                   list_name,)
@@ -137,22 +176,20 @@ class Spinics(GeneralList):
                                                        list_name,
                                                        url_id)
             page = self._fetch_url(current_url)
-            if type(page) != tuple:
+            if type(page) != tuple and not self.over:
                 page = page.read()
-                if not self.over:
-                    self._search_in_page(page, list_name, patterns, date_range)
+                self._search_in_page(page, list_name, patterns, date_range)
             else:
                 break
             url_id += 1
 
     def _search_in_page(self, page, list_name, patterns, date_range):
-        lines = page.split(b'<li><strong>')
-        # Magic index point to the member which stores infomation we need
-        for line in lines[1:]:
-            item = re.split('[<>]', line.decode('utf-8'))
-            if any(match in item[14] for match in patterns):
-                subject = item[2]
-                herf = item[1].split()[2].split('=')[1].replace('"', '')
+        self.parser.feed(page.decode())
+        thread_list = self.parser.thread_list
+        for thread in thread_list:
+            if any([match in thread['email'] for match in patterns]):
+                subject = thread['subject']
+                herf = thread['attrs'][1][1]
                 detail_url = '{0}{1}/{2}'.format(self.url_base,
                                                  list_name,
                                                  herf)
@@ -160,31 +197,26 @@ class Spinics(GeneralList):
                 detail_page = self._fetch_url(detail_url)
                 if type(detail_page) != tuple:
                     detail_lines = detail_page.read().split(b'\n')
-                else:
-                    continue
-                message_id, date = None, None
-                for line in detail_lines:
-                    if b'X-Date:' in line:
-                        d_start = len('<!--X-Date: ')
-                        d_end = -len(' -->')
-                        d_info = line.decode('utf-8')[d_start:d_end]
-                        date = dateparser.parse(d_info.replace('&#45;', '-'))
-                        if date is not None:
-                            date = date.date()
-                        if date < date_range[0]:
-                            self.over = True
-                    elif b'X-Message-Id:' in line:
-                        m_id_start = len('<!--X-Message-Id: ')
-                        m_id_end = -len(' -->')
-                        message_id = line.decode('utf-8')[m_id_start:m_id_end]
-                        # This HTML pages use &#45 instead of -
-                        message_id = message_id.replace('&#45;', '-')
-                    elif message_id and date and not self.over:
-                        self.emails[message_id] = (subject, str(date))
-                        return
-                    elif self.over:
-                        return
-
+                    message_id, date = None, None
+                    for line in detail_lines:
+                        if b'X-Date:' in line:
+                            d_start = len('<!--X-Date: ')
+                            d_end = -len(' -->')
+                            d_info = line.decode('utf-8')[d_start:d_end]
+                            date = dateparser.parse(d_info.replace('&#45;', '-'))
+                            if date is not None:
+                                date = date.date()
+                                if date < date_range[0]:
+                                    self.over = True
+                                    return
+                        elif b'X-Message-Id:' in line:
+                            m_id_start = len('<!--X-Message-Id: ')
+                            m_id_end = -len(' -->')
+                            message_id = line.decode('utf-8')[m_id_start:m_id_end]
+                            # This HTML pages use &#45 instead of -
+                            message_id = message_id.replace('&#45;', '-')
+                        elif message_id and date and date < date_range[1]:
+                            self.emails[message_id] = (subject, str(date))
 
 class GzipArchived(GeneralList):
     """
