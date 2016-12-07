@@ -76,7 +76,7 @@ def main():
             replied.append((count, date, subject))
             replied_count += count
         elif re.match('.*\Wpatch\W.*', subject, re.IGNORECASE):
-            if re.match('.*0\/\d.*', subject, re.IGNORECASE):
+            if re.match('.*\s0+\/\d.*', subject, re.IGNORECASE):
                 others.append((count, date, subject))
                 others_count += count
             else:
