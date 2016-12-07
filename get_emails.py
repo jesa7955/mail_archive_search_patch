@@ -3,11 +3,27 @@
 import calendar
 import datetime
 import gzip
+import io
+import mailbox
 import re
 import sys
 import urllib.request
 import dateparser
 from html.parser import HTMLParser
+
+
+class mboxFromFile(mailbox.mbox):
+    """ Custom class for reading mbox from file object instead of path. """
+    def __init__(self, content, factory=None, create=True):
+        self._message_factory = mailbox.mboxMessage
+        self._file = content
+        self._toc = None
+        self._next_key = 0
+        self._pending = False
+        self._pending_sync = False
+        self._locked = False
+        self._file_length = None
+        self._factory = factory
 
 
 class SpinicsHTMLParser(HTMLParser):
@@ -228,89 +244,55 @@ class GzipArchived(GeneralList):
             self.url_base = url
         super().__init__(options, list_name, debug, timeout)
 
+    def _beautify_string(self, string):
+        if string is not None:
+            return ' '.join(string.split()).strip("<>")
+        return None
+
     def _parse_gz_archive(self, url, options):
         """ Method used to parse information from gziped archive """
         gz_archive = self._fetch_url(url)
         if type(gz_archive) != tuple:
-            with gzip.open(gz_archive, 'r') as gz_file:
-                lines = [line for line in gz_file.read().split(b'\n')]
+            gz_file = gzip.GzipFile(fileobj=io.BytesIO(gz_archive.read()))
+            box = mboxFromFile(gz_file)
         else:
             return
         # Some archiver stores email address as "foo at bar.com" format
         # Examples kexec upstream and kexec-fedora
-        patterns = [b'From ' + email.encode('utf-8')
-                    for email in options.email] + \
-                   [b'From ' + email.replace('@', ' at ').encode('utf-8')
+        patterns = [email for email in options.email] + \
+                   [email.replace("@", " at ")
                     for email in options.email]
-        for index, line in enumerate(lines):
-            if any(match in line for match in patterns):
-                # Sometimes a subject may be splited into multiple lines
-                subject_start, subject_end = None, None
-                for index2, line2 in enumerate(lines[index + 1:]):
-                    if re.match(b'^Subject: .*', line2) and \
-                       subject_end is None:
-                        subject_start = index2
-                    elif re.match(b'^\S*:\s.*', line2) and \
-                            subject_start is not None:
-                        subject_end = index2
-                        subject = b' '.join(
-                                item.strip() for item in
-                                lines[index + 1:][subject_start:subject_end])
-                        subject = subject.decode('utf-8')[len('Subject: '):]
-                        subject_start = None
-                    elif re.match(b'^From\s.*', line2) or \
-                            index2 == len(lines[index + 1:]) - 1:
-                        in_reply_to = False
-                        for next_line in lines[index + 1:index + 1 + index2]:
-                            if re.match(b'^In-Reply-To: .*',
-                                        next_line,
-                                        re.IGNORECASE):
-                                in_reply_to = True
-                            if re.match(b'^Message-ID: .*',
-                                        next_line,
-                                        re.IGNORECASE):
-                                message_id = next_line[len(b'Message-ID: '):]
-                                message_id = message_id.decode().strip('<>')
-                            elif re.match(b'^Date: .*',
-                                          next_line,
-                                          re.IGNORECASE):
-                                date_info = next_line[len(b'Date: '):].decode()
-                        # Confirm whether there is a patch included
-                        patch_start = [
-                                start_index for start_index, start_line in
-                                enumerate(lines[index + 1:index + 1 + index2])
-                                if re.match(b'^--- .*', start_line)]
-                        patch_included = False
-                        for p_start in patch_start:
-                            if index + 1 + p_start + 2 < len(lines):
-                                s_line = re.match(b'^\+\+\+ .*',
-                                                  lines[index + 1 +
-                                                        p_start + 1])
-                                t_line = re.match(b'^@@ .*',
-                                                  lines[index + 1 +
-                                                        p_start + 2])
-                                patch_included = \
-                                    s_line is not None and \
-                                    t_line is not None or \
-                                    patch_included
-                        # Some archives don't include 'Re:' for replies
-                        re_included = re.match('^re:.*|.*\sre:\s.*',
-                                               subject,
-                                               re.IGNORECASE)
-                        if in_reply_to and \
-                           not re_included and \
-                           not patch_included:
-                            subject = 'Re: ' + subject
-                        break
-                # dateparser can't parse date like '2016, Aug, 28, -0500 (EST)'
-                if date_info.find('(') != -1:
-                    date_info = date_info[:date_info.find('(') - 1]
+        for message in box:
+            if any(match in message['from'] for match in patterns):
+                subject = self._beautify_string(message['subject'])
+                message_id = self._beautify_string(message['message-id'])
+                in_reply_to = self._beautify_string(message['in-reply-to'])
+                date_info = message['date']
+                lines = message.as_string().split("\n")
+                patch_start = [
+                        start_index for start_index, start_line in
+                        enumerate(lines) if re.match('^--- .*', start_line)]
+                patch_included = False
+                for p_start in patch_start:
+                    if p_start + 2 < len(lines):
+                        s_line = re.match('^\+\+\+ .*',
+                                lines[p_start + 1])
+                        t_line = re.match('^@@ .*',
+                                lines[p_start + 2])
+                        patch_included = \
+                                s_line is not None and \
+                                t_line is not None
+                re_included = re.match('^re:.*|.*\sre:\s.*',
+                                       subject,
+                                       re.IGNORECASE)
+                if in_reply_to and \
+                   not re_included and \
+                   not patch_included:
+                    subject = 'Re: ' + subject
                 date = dateparser.parse(date_info)
-                # In case we got a date_info which dateparser can't parse
                 if date:
                     date = date.date()
                 self.emails[message_id] = (subject, str(date))
-
 
 class RHInternal(GzipArchived):
     """ Class for retrieving emails from internal Red Hat lists(deprecated) """
